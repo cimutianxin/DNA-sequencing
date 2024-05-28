@@ -179,7 +179,7 @@ ref_seqs_map = {
     "GGTA": 28.0,
     "GGTC": 17.8,
     "GGTG": 25.5,
-    "GGIT": 20.3,
+    "GGTT": 20.3,
     "GTAA": 40.3,
     "GTAC": 38.5,
     "GTAG": 38.0,

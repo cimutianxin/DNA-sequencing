@@ -57,7 +57,9 @@ def extra_process(abf):
 def find_events(abf):
     """
     找出有效的区间ranges
-    outputs: time_ranges: sweepX上的秒数; index_ranges: 起止index
+    [->
+    time_ranges: sweepX上的秒数; index_ranges: 起止index
+    TODO：在find_change_points, 大于10s的区间效率不高, 故将大于10s的区间分割
     """
     index_ranges = []
 
@@ -89,6 +91,14 @@ def find_events(abf):
         if np.std(sweepY[start:end]) < max_std
     ]
 
+    # 如果一个区间大于10s，那么将其分割
+    # for start, end in index_ranges:
+    #     if end - start > 50000:
+    #         index_ranges.remove((start, end))
+    #         index_ranges.append((start, start + 100000))
+    #         index_ranges.append((start + 100000, end))
+        
+
     # 输出sweepX的ranges部分
     time_ranges = []
     for start, end in index_ranges:
@@ -98,6 +108,11 @@ def find_events(abf):
 
 
 def change_points(abf, ranges) -> list:
+    """
+    ranges:是一个list，每个元素是一个tuple，表示一个有效区间的起止index
+    在每个有效区间内寻找change points
+    当一个区间大于10s时，其效果不好
+    """
     change_points = []
     for start, end in ranges:
         y = np.array(abf.sweepY[start:end])
