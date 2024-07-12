@@ -15,6 +15,8 @@ from multiprocessing import Pool, Manager
 from jax import jit
 from functools import partial
 import jax.numpy as jnp
+from numpy.lib.stride_tricks import sliding_window_view
+from statsmodels.graphics.tsaplots import plot_acf
 
 sys.setrecursionlimit(100000)
 
@@ -50,8 +52,64 @@ def downsample(abf, DOWNSP_RATE=100):
 def extra_process(abf):
     """
     对 abf 数据进行预处理
+    1. event 内的中值
+    2. 除去中值偏差+-3std的数据
     """
     return abf
+
+
+def replace_outliers_with_bounds(arr, window_size=100):
+    # 创建滑动窗口视图
+    windows = sliding_window_view(arr, window_size)
+    half_window = window_size // 2
+
+    result = arr.copy()
+    for i in range(half_window, len(arr) - half_window):
+        window = windows[i - half_window]
+        median = np.median(window)
+        std_dev = np.std(window)
+        lower_bound = median - 3 * std_dev
+        upper_bound = median + 3 * std_dev
+
+        if result[i] < lower_bound:
+            result[i] = lower_bound
+        elif result[i] > upper_bound:
+            result[i] = upper_bound
+
+    return result
+
+
+def find_events_arr(arr):
+    """
+    找出有效的区间ranges
+    [->
+    time_ranges: sweepX上的秒数; index_ranges: 起止index
+    """
+    index_ranges = []
+
+    # 找出电流大小在一定范围内(1,60)的连续区间
+    start = None
+    for i, value in enumerate(arr):
+        if -10 <= value <= 80:
+            if start is None:
+                start = i
+        else:
+            if start is not None:
+                index_ranges.append((start, i))
+                start = None
+    if start is not None:
+        index_ranges.append((start, len(arr) - 1))
+
+    # 除去太短的部分 1 s = 454 个碱基 = 5000 index
+    # 原文：discard events of duration < 1 second
+    index_ranges = [(start, end) for start, end in index_ranges if end - start > 1000]
+
+    # 输出sweepX的ranges部分
+    time_ranges = []
+    for start, end in index_ranges:
+        time_ranges.append((start / 5000, end / 5000))
+
+    return index_ranges, time_ranges
 
 
 def find_events(abf):
@@ -69,7 +127,7 @@ def find_events(abf):
     # 找出电流大小在一定范围内(1,60)的连续区间
     start = None
     for i, value in enumerate(sweepY):
-        if 1 <= value <= 60:
+        if 1 <= value <= 80:
             if start is None:
                 start = i
         else:
@@ -84,12 +142,8 @@ def find_events(abf):
     index_ranges = [(start, end) for start, end in index_ranges if end - start > 5000]
 
     # 如果一个区间内的数据点的标准差小于某个阈值，那么这个区间就是一个有效的区间，A1的这一段是3.2497375，论文设置为5
-    max_std = 5
-    index_ranges = [
-        (start, end)
-        for start, end in index_ranges
-        if np.std(sweepY[start:end]) < max_std
-    ]
+    # max_std = 10
+    # index_ranges = [(start, end) for start, end in index_ranges if np.std(sweepY[start:end]) < max_std]
 
     # 如果一个区间大于10s，那么将其分割
     # for start, end in index_ranges:
@@ -97,7 +151,6 @@ def find_events(abf):
     #         index_ranges.remove((start, end))
     #         index_ranges.append((start, start + 100000))
     #         index_ranges.append((start + 100000, end))
-        
 
     # 输出sweepX的ranges部分
     time_ranges = []
@@ -161,7 +214,7 @@ def find_change_points(y, threshold=-50, mindur=5) -> list:
             return []
         t2, min_logp = search(t1, t3)
         if min_logp < threshold:
-        #    print("found:", t2)
+            #    print("found:", t2)
             return find(t1, t2) + [t2] + find(t2, t3)
         else:
             return []
@@ -193,10 +246,24 @@ def calc_level(abf, sub_change_points) -> pd.DataFrame:
             "change_point": sub_change_points[i],
             "level": np.mean(abf.sweepY[sub_change_points[i] : sub_change_points[i + 1]]),
         }
-    df.loc[len(df)] = {
-        "change_point": sub_change_points[-1],
-        "level": df.iloc[-1]["level"]
-    }# 补全终点
+    df.loc[len(df)] = {"change_point": sub_change_points[-1], "level": df.iloc[-1]["level"]}  # 补全终点
+    return df
+
+
+def calc_level4arr(arr, sub_change_points) -> pd.DataFrame:
+    """
+    index
+    change_point
+    level: i和i+1之间的平均值
+    """
+    df = pd.DataFrame(columns=["change_point", "level"])
+    df = df.astype({"change_point": int, "level": float})
+    for i in range(len(sub_change_points) - 1):
+        df.loc[len(df)] = {
+            "change_point": sub_change_points[i],
+            "level": np.mean(arr[sub_change_points[i] : sub_change_points[i + 1]]),
+        }
+    df.loc[len(df)] = {"change_point": sub_change_points[-1], "level": df.iloc[-1]["level"]}  # 补全终点
     return df
 
 
@@ -204,3 +271,18 @@ def calc_level(abf, sub_change_points) -> pd.DataFrame:
 # i_ranges_A1, t_ranges_A1 = find_events(abf_A1)
 # print("A1 时间范围：", t_ranges_A1, "index范围: ", i_ranges_A1)
 # change_points_A1 = change_points(abf_A1, i_ranges_A1)
+
+
+def plot_autocorrelation(arr, lags=1000):
+    """
+    计算并绘制自相关系数
+    :param arr: 输入的时间序列数据
+    :param lags: 滞后阶数a, 默认为1000即0.2s
+    :return: None
+    """
+    plt.figure(figsize=(12, 6))
+    plot_acf(arr, lags=lags)
+    plt.xlabel("Lag")
+    plt.ylabel("Autocorrelation")
+    plt.title("Autocorrelation Function")
+    plt.show()
