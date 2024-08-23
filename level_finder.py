@@ -17,6 +17,8 @@ from functools import partial
 import jax.numpy as jnp
 from numpy.lib.stride_tricks import sliding_window_view
 from statsmodels.graphics.tsaplots import plot_acf
+from tqdm import tqdm
+from IPython.display import clear_output
 
 sys.setrecursionlimit(100000)
 
@@ -107,7 +109,7 @@ def find_events_arr(arr):
     # 输出sweepX的ranges部分
     time_ranges = []
     for start, end in index_ranges:
-        time_ranges.append((start / 5000, end / 5000))
+        time_ranges.append((start / 1000, end / 1000))
 
     return index_ranges, time_ranges
 
@@ -199,11 +201,13 @@ def find_change_points(y, threshold=-50, mindur=5) -> list:
     def search(t1, t3):
         min_logp = inf
         min_t2 = None
-        for t2 in range(t1 + mindur, t3 - mindur + 1):
+        for t2 in tqdm(range(t1 + mindur, t3 - mindur + 1), desc=f"Searching in range [{t1}, {t3}]"):
             current_logp = logp(t1, t2, t3)
             if current_logp < min_logp:
                 min_logp = current_logp
                 min_t2 = t2
+
+        clear_output(wait=True)
         return min_t2, min_logp
 
     def find(t1, t3):
@@ -231,6 +235,11 @@ def find_change_points(y, threshold=-50, mindur=5) -> list:
     #     else:
     #         t3 += 1
     # return change_points
+
+
+def find_change_points_split(y, threshold=-50, mindur=5) -> list:
+    # TODO: 分段的change point算法
+    return []
 
 
 def calc_level(abf, sub_change_points) -> pd.DataFrame:

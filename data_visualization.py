@@ -53,20 +53,23 @@ def plot_arrs(arrs, title_prefix=""):
     return fig
 
 
-def plot_arr(arr, title_prefix=""):
+def plot_arr(arr, title_prefix="", ax=None):
     """
     接受array，用于画划分好事件后的event
     必须是单个event.
     可以使用 `arrs[0][:5000]` 的方法控制范围
     """
-    fig = plt.figure(figsize=(30, 9))
-    plt.title(f"duration {len(arr)/5000:.2f}s")
-    # 创建步进图
-    plt.step([x / 5000 for x in range(len(arr))], arr, alpha=0.75, where="post")
+    if ax is None:
+        fig = plt.figure(figsize=(30, 9))
+        plt.title(f"{title_prefix} duration {len(arr)/5000:.2f}s")
+        plt.step([t / 5000 for t in range(len(arr))], arr, alpha=0.75, where="post")
+        plt.xlabel("Time (s)")
+        return fig
 
-    # 设置横轴标签
-    plt.xlabel("Time (s)")
-    return fig
+    ax.step([t / 5000 for t in range(len(arr))], arr, alpha=0.75, where="post")
+    ax.set_title(f"{title_prefix} duration {len(arr)/5000:.2f}s")
+    ax.set_xlabel("Time (s)")
+    return ax
 
 
 def step_abf_lvls(abf, df_lvl, range_type="default", start_index=None, end_index=None, title_prefix=""):
@@ -122,9 +125,9 @@ def step_abf_lvls(abf, df_lvl, range_type="default", start_index=None, end_index
     return fig
 
 
-def step_arr_lvls(abf, df_lvl, range_type="default", start_index=None, end_index=None, title_prefix=""):
+def step_arr_lvls(arr, df_lvl, range_type="default", start_index=None, end_index=None, title_prefix=""):
     """
-    在abf图上画出level的step图
+    在arr图上画出level的step图
     """
     fig = plt.figure(figsize=(30, 9))
     # 作图范围
@@ -140,12 +143,14 @@ def step_arr_lvls(abf, df_lvl, range_type="default", start_index=None, end_index
 
     # label
     plt.title("%s" % title_prefix)
-    plt.ylabel(abf.sweepLabelY)
-    plt.xlabel(abf.sweepLabelX)
-    # 作abf图
+    # plt.ylabel(abf.sweepLabelY)
+    # plt.xlabel(abf.sweepLabelX)
+
+    arr = arr[start_index:end_index]
+    # 作arr图
     plt.step(
-        abf.sweepX[start_index:end_index],
-        abf.sweepY[start_index:end_index],
+        [t / 5000 for t in range(len(arr))],
+        arr,
         alpha=0.75,
         where="mid",
     )
