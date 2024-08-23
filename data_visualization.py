@@ -53,7 +53,7 @@ def plot_arrs(arrs, title_prefix=""):
     return fig
 
 
-def plot_arr(arr, title_prefix="", ax=None):
+def plot_arr(arr, title_prefix="", ax=None, sample_rate=500):
     """
     接受array，用于画划分好事件后的event
     必须是单个event.
@@ -61,18 +61,20 @@ def plot_arr(arr, title_prefix="", ax=None):
     """
     if ax is None:
         fig = plt.figure(figsize=(30, 9))
-        plt.title(f"{title_prefix} duration {len(arr)/5000:.2f}s")
-        plt.step([t / 5000 for t in range(len(arr))], arr, alpha=0.75, where="post")
+        plt.title(f"{title_prefix} duration {len(arr)/(10*sample_rate):.2f}s")
+        plt.step([t / (10 * sample_rate) for t in range(len(arr))], arr, alpha=0.75, where="post")
         plt.xlabel("Time (s)")
         return fig
 
-    ax.step([t / 5000 for t in range(len(arr))], arr, alpha=0.75, where="post")
-    ax.set_title(f"{title_prefix} duration {len(arr)/5000:.2f}s")
+    ax.step([t / (10 * sample_rate) for t in range(len(arr))], arr, alpha=0.75, where="post")
+    ax.set_title(f"{title_prefix} duration {len(arr)/(10*sample_rate):.2f}s")
     ax.set_xlabel("Time (s)")
     return ax
 
 
-def step_abf_lvls(abf, df_lvl, range_type="default", start_index=None, end_index=None, title_prefix=""):
+def step_abf_lvls(
+    abf, df_lvl, range_type="default", start_index=None, end_index=None, title_prefix="", sample_rate=500
+):
     """
     在abf图上画出level的step图
     """
@@ -125,7 +127,9 @@ def step_abf_lvls(abf, df_lvl, range_type="default", start_index=None, end_index
     return fig
 
 
-def step_arr_lvls(arr, df_lvl, range_type="default", start_index=None, end_index=None, title_prefix=""):
+def step_arr_lvls(
+    arr, df_lvl, range_type="default", start_index=None, end_index=None, title_prefix="", sample_rate=500
+):
     """
     在arr图上画出level的step图
     """
@@ -149,14 +153,14 @@ def step_arr_lvls(arr, df_lvl, range_type="default", start_index=None, end_index
     arr = arr[start_index:end_index]
     # 作arr图
     plt.step(
-        [t / 5000 for t in range(len(arr))],
+        [t / (10 * sample_rate) for t in range(len(arr))],
         arr,
         alpha=0.75,
         where="mid",
     )
     # 作level图
     x = [
-        df_lvl.iloc[i]["change_point"] / 5000
+        df_lvl.iloc[i]["change_point"] / (10 * sample_rate)
         for i in range(len(df_lvl))
         if start_index <= df_lvl.iloc[i]["change_point"] <= end_index
     ]
@@ -180,7 +184,7 @@ def step_arr_lvls(arr, df_lvl, range_type="default", start_index=None, end_index
     return fig
 
 
-def step_abf_lvls_250(abf, df_lvl, typical=False, title_prefix=""):
+def step_abf_lvls_100(abf, df_lvl, typical=False, title_prefix=""):
     """
     在abf图上画出level的step图
     """
@@ -204,7 +208,7 @@ def step_abf_lvls_250(abf, df_lvl, typical=False, title_prefix=""):
     )
     # 作level图
     x = [
-        df_lvl.iloc[i]["change_point"] / 2500
+        df_lvl.iloc[i]["change_point"] / 1000
         for i in range(len(df_lvl))
         if start_index <= df_lvl.iloc[i]["change_point"] <= end_index
     ]
